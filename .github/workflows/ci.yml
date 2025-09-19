@@ -1,0 +1,67 @@
+name: Laravel + Selenium CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      selenium:
+        image: selenium/standalone-chrome:latest
+        ports:
+          - 4444:4444
+
+    steps:
+      # 1️⃣ Checkout the repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up PHP
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, bcmath, curl, fileinfo, openssl, pdo, sqlite
+          ini-values: post_max_size=256M, upload_max_filesize=256M
+          coverage: xdebug
+
+      # 3️⃣ Install Composer dependencies
+      - name: Install Composer dependencies
+        run: |
+          composer install --no-interaction --prefer-dist
+
+      # 4️⃣ Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+
+      # 5️⃣ Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium pytest pytest-html
+
+      # 6️⃣ Start Laravel server in background
+      - name: Start Laravel server
+        run: |
+          php artisan key:generate
+          php artisan serve --host=127.0.0.1 --port=8000 &
+          sleep 10  # wait for server to start
+
+      # 7️⃣ Run Pytest Selenium tests
+      - name: Run Selenium + Pytest tests
+        run: |
+          pytest test/ --html=report.html --self-contained-html
+
+      # 8️⃣ Upload test report
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: selenium-test-report
+          path: report.html
